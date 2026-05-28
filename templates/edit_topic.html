@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Editar tópico — Podcast Finder{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">Tópicos</a> › Editar
+</div>
+
+<div class="card" style="max-width:500px">
+  <h2>Editar tópico</h2>
+  <form method="post" action="/topics/{{ topic.id }}/edit">
+    <div class="form-group">
+      <label for="title">Título</label>
+      <input type="text" id="title" name="title" value="{{ topic.title }}" required autofocus>
+    </div>
+    <div class="row">
+      <button type="submit" class="btn btn-primary">Salvar</button>
+      <a href="/" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

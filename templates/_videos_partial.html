@@ -1,0 +1,73 @@
+<div id="video-list"
+  {% if has_active %}
+  hx-get="/topics/{{ topic.id }}/videos-partial"
+  hx-trigger="every 5s"
+  hx-swap="outerHTML"
+  {% endif %}>
+
+{% if videos %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Vídeo</th>
+        <th>Status</th>
+        <th>Dores</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in videos %}
+      <tr>
+        <td style="max-width:320px">
+          <div style="font-weight:500;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ v.title or v.url }}
+          </div>
+          {% if v.title %}
+          <div style="font-size:.75rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.url }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge badge-{{ v.status }}">
+            {% if v.status == 'queued' %}Na fila
+            {% elif v.status == 'processing' %}Processando…
+            {% elif v.status == 'completed' %}Concluído
+            {% elif v.status == 'failed' %}Falhou
+            {% elif v.status == 'waiting_manual_transcript' %}Aguarda transcrição
+            {% elif v.status == 'ignored' %}Ignorado
+            {% else %}{{ v.status }}{% endif %}
+          </span>
+        </td>
+        <td>
+          {% if v.status == 'completed' %}
+          <a href="/videos/{{ v.id }}" class="btn btn-ghost btn-sm">Ver dores</a>
+          {% elif v.status == 'waiting_manual_transcript' %}
+          <a href="/videos/{{ v.id }}" class="btn btn-warn btn-sm">Colar transcrição</a>
+          {% elif v.status == 'failed' %}
+          <form method="post" action="/videos/{{ v.id }}/retry" style="display:inline">
+            <button class="btn btn-ghost btn-sm">Retentar</button>
+          </form>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/videos/{{ v.id }}/delete" onsubmit="return confirm('Deletar vídeo e suas dores?')">
+            <button type="submit" class="btn btn-danger btn-sm">×</button>
+          </form>
+        </td>
+      </tr>
+      {% if v.error_msg and v.status not in ['completed','ignored'] %}
+      <tr>
+        <td colspan="4" style="padding-top:0">
+          <span style="font-size:.78rem;color:#991b1b">{{ v.error_msg }}</span>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty card">Nenhum vídeo adicionado ainda.</div>
+{% endif %}
+
+</div>

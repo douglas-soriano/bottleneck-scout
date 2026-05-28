@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Tópicos — Podcast Finder{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <h1 style="margin-bottom:0">Tópicos de Pesquisa</h1>
+</div>
+
+<div class="card card-sm" style="margin-bottom:1.5rem">
+  <form method="post" action="/topics" style="display:flex;gap:.5rem;align-items:flex-end">
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label for="title">Novo tópico</label>
+      <input type="text" id="title" name="title" placeholder="Ex: Clínicas veterinárias" required autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary">Criar</button>
+  </form>
+</div>
+
+{% if topics %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Tópico</th>
+        <th>Vídeos</th>
+        <th>Criado em</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in topics %}
+      <tr>
+        <td>
+          <a href="/topics/{{ t.id }}" style="font-weight:600;color:#0f172a">{{ t.title }}</a>
+        </td>
+        <td>
+          <span class="count-badge">{{ t.video_count }} vídeo{% if t.video_count != 1 %}s{% endif %}</span>
+        </td>
+        <td class="conf">{{ t.created_at[:10] }}</td>
+        <td>
+          <div class="row" style="justify-content:flex-end">
+            <a href="/topics/{{ t.id }}/edit" class="btn btn-ghost btn-sm">Editar</a>
+            <form method="post" action="/topics/{{ t.id }}/delete" onsubmit="return confirm('Deletar tópico e todos os vídeos/dores?')">
+              <button type="submit" class="btn btn-danger btn-sm">Deletar</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty card">
+  Nenhum tópico ainda. Crie o primeiro acima.
+</div>
+{% endif %}
+{% endblock %}

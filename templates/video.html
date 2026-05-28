@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ video.title or video.url }} — Podcast Finder{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">Tópicos</a> ›
+  <a href="/topics/{{ topic.id }}">{{ topic.title }}</a> ›
+  {{ video.title or 'Vídeo' }}
+</div>
+
+<div class="card" style="margin-bottom:1.25rem">
+  <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1">
+      <h1 style="font-size:1.15rem;margin-bottom:.35rem">{{ video.title or video.url }}</h1>
+      <div style="font-size:.82rem;color:#64748b">
+        <a href="{{ video.url }}" target="_blank">{{ video.url }}</a>
+      </div>
+    </div>
+    <span class="badge badge-{{ video.status }}">
+      {% if video.status == 'queued' %}Na fila
+      {% elif video.status == 'processing' %}Processando…
+      {% elif video.status == 'completed' %}Concluído
+      {% elif video.status == 'failed' %}Falhou
+      {% elif video.status == 'waiting_manual_transcript' %}Aguarda transcrição manual
+      {% elif video.status == 'ignored' %}Ignorado
+      {% else %}{{ video.status }}{% endif %}
+    </span>
+  </div>
+
+  {% if video.error_msg %}
+  <div class="alert alert-warn" style="margin-top:1rem">{{ video.error_msg }}</div>
+  {% endif %}
+</div>
+
+<!-- Manual transcript form -->
+{% if video.status == 'waiting_manual_transcript' %}
+<div class="card" style="margin-bottom:1.25rem">
+  <h2>Colar transcrição manual</h2>
+  <p style="font-size:.875rem;color:#475569;margin-bottom:.75rem">
+    Cole abaixo a transcrição ou legenda do vídeo. Timestamps no formato <code>[MM:SS]</code> ajudam na extração.
+  </p>
+  <form method="post" action="/videos/{{ video.id }}/transcript">
+    <div class="form-group">
+      <textarea name="transcript" rows="10" placeholder="[00:00] Olá, bem-vindo ao podcast...&#10;[01:30] O maior problema que temos é..."></textarea>
+    </div>
+    <div class="row">
+      <button type="submit" class="btn btn-primary">Processar transcrição</button>
+      <form method="post" action="/videos/{{ video.id }}/ignore" style="display:inline">
+        <button type="submit" class="btn btn-ghost">Ignorar vídeo</button>
+      </form>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<!-- Pains list -->
+{% if pains %}
+<div class="section-header">
+  <h2>Dores extraídas</h2>
+  <span class="count-badge">{{ pains|length }}</span>
+</div>
+
+{% for p in pains %}
+<div class="pain-card">
+  <div style="display:flex;gap:.5rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1">
+      {% if p.cluster_id %}
+      <a href="/clusters/{{ p.cluster_id }}" style="font-weight:600;color:#0f172a">{{ p.title }}</a>
+      {% else %}
+      <span style="font-weight:600">{{ p.title }}</span>
+      {% endif %}
+      {% if p.category %}
+      <span style="font-size:.75rem;background:#f0f9ff;color:#0369a1;padding:.1rem .4rem;border-radius:4px;margin-left:.35rem">{{ p.category }}</span>
+      {% endif %}
+    </div>
+    <div class="row">
+      <span class="sev sev-{{ p.severity or 3 }}">sev {{ p.severity or 3 }}</span>
+      <span class="conf conf-{{ p.confidence or 'medium' }}">{{ p.confidence or 'medium' }}</span>
+    </div>
+  </div>
+
+  {% if p.summary %}
+  <div style="font-size:.85rem;color:#374151;margin-top:.4rem">{{ p.summary }}</div>
+  {% endif %}
+
+  {% if p.quote %}
+  <div class="pain-quote">{{ p.quote }}</div>
+  {% endif %}
+
+  <div class="pain-meta">
+    {% if p.timestamp_seconds is not none %}
+    <a href="{{ p.youtube_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
+    {% endif %}
+    {% if p.area %}
+    <span class="conf">Área: {{ p.area }}</span>
+    {% endif %}
+    {% if p.who_suffers %}
+    <span class="conf">Quem sofre: {{ p.who_suffers }}</span>
+    {% endif %}
+    {% if p.speaker_context %}
+    <span class="conf">Falante: {{ p.speaker_context }}</span>
+    {% endif %}
+  </div>
+
+  {% if p.business_impact %}
+  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impacto:</strong> {{ p.business_impact }}</div>
+  {% endif %}
+
+  {% if p.opportunity %}
+  <div class="pain-opportunity">💡 {{ p.opportunity }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% elif video.status == 'completed' %}
+<div class="empty card">Nenhuma dor encontrada neste vídeo.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ cluster.title }} — Podcast Finder{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">Tópicos</a> ›
+  <a href="/topics/{{ topic.id }}">{{ topic.title }}</a> ›
+  {{ cluster.title }}
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+  <div style="display:flex;gap:.75rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1">
+      <h1 style="font-size:1.2rem;margin-bottom:.3rem">{{ cluster.title }}</h1>
+      {% if cluster.category %}
+      <span style="font-size:.8rem;background:#f0f9ff;color:#0369a1;padding:.2rem .5rem;border-radius:4px">{{ cluster.category }}</span>
+      {% endif %}
+    </div>
+    <div>
+      <span class="count-badge">{{ pains|length }} menção{% if pains|length != 1 %}ões{% endif %}</span>
+    </div>
+  </div>
+
+  {% if cluster.summary %}
+  <div style="font-size:.9rem;color:#374151;margin-top:.75rem">{{ cluster.summary }}</div>
+  {% endif %}
+</div>
+
+{% if pains %}
+<h2>Todas as menções</h2>
+
+{% for p in pains %}
+<div class="pain-card">
+  <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem">
+    <div style="font-weight:600;color:#0f172a;font-size:.9rem;flex:1">
+      <a href="/videos/{{ p.video_id }}" style="color:#0f172a">
+        {{ p.video_title or p.video_url }}
+      </a>
+    </div>
+    <span class="sev sev-{{ p.severity or 3 }}">sev {{ p.severity or 3 }}</span>
+    <span class="conf conf-{{ p.confidence or 'medium' }}">{{ p.confidence or 'medium' }}</span>
+  </div>
+
+  {% if p.quote %}
+  <div class="pain-quote">{{ p.quote }}</div>
+  {% endif %}
+
+  {% if p.summary %}
+  <div style="font-size:.84rem;color:#374151;margin-top:.3rem">{{ p.summary }}</div>
+  {% endif %}
+
+  <div class="pain-meta">
+    {% if p.timestamp_seconds is not none %}
+    <a href="{{ p.youtube_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
+    {% endif %}
+    {% if p.speaker_context %}
+    <span class="conf">Falante: {{ p.speaker_context }}</span>
+    {% endif %}
+    {% if p.who_suffers %}
+    <span class="conf">Quem sofre: {{ p.who_suffers }}</span>
+    {% endif %}
+    {% if p.area %}
+    <span class="conf">Área: {{ p.area }}</span>
+    {% endif %}
+  </div>
+
+  {% if p.business_impact %}
+  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impacto:</strong> {{ p.business_impact }}</div>
+  {% endif %}
+
+  {% if p.opportunity %}
+  <div class="pain-opportunity">💡 {{ p.opportunity }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty card">Nenhuma menção encontrada.</div>
+{% endif %}
+
+{% endblock %}

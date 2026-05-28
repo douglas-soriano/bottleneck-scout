@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.title }} — Podcast Finder{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">Tópicos</a> › {{ topic.title }}
+</div>
+
+<div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
+  <h1 style="margin-bottom:0;flex:1">{{ topic.title }}</h1>
+  <div class="row">
+    <a href="/topics/{{ topic.id }}/edit" class="btn btn-ghost btn-sm">Editar título</a>
+  </div>
+</div>
+
+<!-- Add videos -->
+<div class="card card-sm" style="margin-bottom:1.5rem">
+  <form method="post" action="/topics/{{ topic.id }}/videos">
+    <div class="form-group" style="margin-bottom:.5rem">
+      <label for="urls">Adicionar links do YouTube <span style="font-weight:400;color:#64748b">(um por linha)</span></label>
+      <textarea id="urls" name="urls" placeholder="https://www.youtube.com/watch?v=...&#10;https://youtu.be/..." rows="3"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Adicionar à fila</button>
+  </form>
+</div>
+
+<!-- Video list (HTMX-polled) -->
+<div class="section-header">
+  <h2>Vídeos</h2>
+</div>
+
+{% include "_videos_partial.html" %}
+
+<!-- Ranking -->
+{% if ranking %}
+<div class="section-header" style="margin-top:2rem">
+  <h2>Ranking de Dores</h2>
+  <span class="count-badge">{{ ranking|length }} grupo{% if ranking|length != 1 %}s{% endif %}</span>
+</div>
+
+<div>
+  {% for item in ranking %}
+  <div class="pain-card" style="display:flex;gap:1rem;align-items:flex-start">
+    <div class="rank-num">#{{ loop.index }}</div>
+    <div style="flex:1">
+      <div style="display:flex;align-items:flex-start;gap:.5rem;flex-wrap:wrap">
+        <a href="/clusters/{{ item.id }}" style="font-weight:600;color:#0f172a;font-size:.95rem;flex:1">{{ item.title }}</a>
+        {% if item.category %}
+        <span style="font-size:.75rem;background:#f0f9ff;color:#0369a1;padding:.1rem .4rem;border-radius:4px;white-space:nowrap">{{ item.category }}</span>
+        {% endif %}
+      </div>
+
+      <div class="pain-meta">
+        <span class="count-badge">{{ item.video_count }} vídeo{% if item.video_count != 1 %}s{% endif %}</span>
+        <span class="count-badge">{{ item.mention_count }} menção{% if item.mention_count != 1 %}ões{% endif %}</span>
+        <span class="sev sev-{{ item.avg_severity|int }}">sev {{ item.avg_severity }}</span>
+      </div>
+
+      {% if item.summary %}
+      <div style="font-size:.84rem;color:#374151;margin-top:.4rem">{{ item.summary }}</div>
+      {% endif %}
+
+      {% if item.best_quote %}
+      <div class="pain-quote">{{ item.best_quote }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% elif videos %}
+<div class="alert alert-info" style="margin-top:2rem">
+  Nenhuma dor extraída ainda. Aguarde o processamento dos vídeos.
+</div>
+{% endif %}
+
+{% endblock %}
