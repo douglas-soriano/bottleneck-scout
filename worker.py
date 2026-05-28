@@ -36,29 +36,69 @@ def fetch_title(url: str) -> str | None:
 
 
 def get_transcript(youtube_id: str) -> str | None:
-    try:
-        from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-        try:
-            items = YouTubeTranscriptApi.get_transcript(youtube_id, languages=["pt", "pt-BR", "pt-PT"])
-        except NoTranscriptFound:
-            items = YouTubeTranscriptApi.get_transcript(youtube_id)
+    from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 
-        parts = []
-        for item in items:
-            t = int(item["start"])
-            parts.append(f"[{t // 60:02d}:{t % 60:02d}] {item['text']}")
-        return "\n".join(parts)
-    except Exception:
+    try:
+        # Try preferred languages first (manual or auto-generated)
+        try:
+            items = YouTubeTranscriptApi.get_transcript(
+                youtube_id,
+                languages=["pt-BR", "pt", "en"],
+            )
+            log.info("Transcript: preferred language found for %s", youtube_id)
+        except Exception as e1:
+            log.info("Transcript: preferred language failed (%s), trying any available", e1)
+            # Fall back to any available transcript
+            transcript_list = YouTubeTranscriptApi.list_transcripts(youtube_id)
+            available = list(transcript_list)
+            if not available:
+                log.warning("Transcript: no transcripts available for %s", youtube_id)
+                return None
+            chosen = available[0]
+            log.info(
+                "Transcript: using %s (lang=%s, auto=%s)",
+                youtube_id, chosen.language_code, chosen.is_generated
+            )
+            items = chosen.fetch()
+    except TranscriptsDisabled:
+        log.warning("Transcript: transcripts disabled for %s", youtube_id)
         return None
+    except Exception as e:
+        log.warning("Transcript: unexpected error for %s: %s", youtube_id, e)
+        return None
+
+    parts = []
+    for item in items:
+        start = int(item["start"])
+        mm, ss = divmod(start, 60)
+        parts.append(f"[{mm:02d}:{ss:02d}] {item['text']}")
+
+    if not parts:
+        log.warning("Transcript: fetched empty transcript for %s", youtube_id)
+        return None
+
+    log.info("Transcript: %d segments for %s", len(parts), youtube_id)
+    return "\n".join(parts)
 
 
 def save_pains(video_id: int, topic_id: int, pains: list[dict], video_url: str):
+    import datetime
     youtube_id = extract_youtube_id(video_url)
 
-    for pain in pains:
-        # Get current clusters (re-read each time so newly inserted ones are visible)
-        clusters = db.get_clusters_for_topic(topic_id)
-        cluster_id = gemini_client.find_cluster(pain, clusters)
+    if not pains:
+        db.update_video(video_id, status="completed", processed_at=datetime.datetime.utcnow().isoformat())
+        return
+
+    # Single batch call to assign all pains to existing clusters
+    existing_clusters = db.get_clusters_for_topic(topic_id)
+    assignments = gemini_client.find_clusters_batch(pains, existing_clusters)
+
+    for pain, cluster_id in zip(pains, assignments):
+        # Validate cluster_id still exists (race condition guard)
+        if cluster_id is not None:
+            valid = any(c["id"] == cluster_id for c in existing_clusters)
+            if not valid:
+                cluster_id = None
 
         if cluster_id is None:
             cluster_id = db.insert_cluster(
@@ -79,7 +119,6 @@ def save_pains(video_id: int, topic_id: int, pains: list[dict], video_url: str):
         }
         db.insert_pain(pain_row)
 
-    import datetime
     db.update_video(video_id, status="completed", processed_at=datetime.datetime.utcnow().isoformat())
 
 
@@ -101,30 +140,34 @@ def process_video(video: dict):
 
     pains = None
 
-    # Attempt 1: direct URL to Gemini
-    try:
-        pains = gemini_client.extract_pains_from_url(url, topic_title=topic_title)
-        log.info("Video %d: extracted %d pains via URL", video_id, len(pains))
-    except Exception as e:
-        log.warning("Video %d: direct URL failed: %s", video_id, e)
+    # Step 1: get transcript via youtube-transcript-api
+    transcript = None
+    if youtube_id:
+        transcript = get_transcript(youtube_id)
+        if transcript:
+            log.info("Video %d: transcript fetched (%d chars)", video_id, len(transcript))
+        else:
+            log.warning("Video %d: no transcript available", video_id)
 
-    # Attempt 2: transcript
-    if not pains and youtube_id:
-        try:
-            transcript = get_transcript(youtube_id)
-            if transcript:
-                pains = gemini_client.extract_pains_from_transcript(transcript, url, topic_title=topic_title)
-                log.info("Video %d: extracted %d pains via transcript", video_id, len(pains))
-        except Exception as e:
-            log.warning("Video %d: transcript failed: %s", video_id, e)
-
-    if not pains:
+    if not transcript:
         db.update_video(
             video_id,
             status="waiting_manual_transcript",
             error_msg="Não foi possível obter transcrição automática. Cole a transcrição manualmente."
         )
         return
+
+    # Step 2: send transcript to Gemini
+    try:
+        pains = gemini_client.extract_pains_from_transcript(transcript, url, topic_title=topic_title)
+        log.info("Video %d: extracted %d pains", video_id, len(pains))
+    except Exception as e:
+        log.error("Video %d: Gemini extraction failed: %s", video_id, e)
+        db.update_video(video_id, status="failed", error_msg=str(e))
+        return
+
+    if not pains:
+        log.warning("Video %d: Gemini returned no pains", video_id)
 
     try:
         save_pains(video_id, topic_id, pains, url)

@@ -12,25 +12,31 @@ def _build_extraction_prompt(topic_title: str) -> str:
 
 Mercado sendo analisado: {market}
 
-Analise este podcast e extraia SOMENTE sinais relevantes sobre o mercado de {market}.
+Analise este podcast e extraia SOMENTE sinais de gargalo, dor ou ineficiência do mercado de {market}.
 
-Extraia apenas situações que revelem:
-- Gargalos operacionais ou de processo
-- Processos manuais, lentos ou ineficientes
-- Dores recorrentes de quem atua no setor
-- Dificuldades comerciais, de distribuição, vendas ou marketing
-- Problemas de produção, atendimento ou relacionamento com clientes
-- Custos elevados, atrasos, retrabalho ou desperdício
-- Obstáculos para crescer, escalar ou tomar decisões
-- Limitações estruturais do mercado
+CRITÉRIO DE INCLUSÃO — inclua apenas se passar por ao menos 1 destes testes:
+- Revela processo manual, lento ou feito "na mão"
+- Revela gargalo operacional claro
+- Revela dificuldade de venda, marketing, distribuição ou aquisição
+- Revela custo alto ou inesperado
+- Revela perda de tempo recorrente
+- Revela retrabalho ou erro que precisa ser corrigido
+- Revela decisão tomada com pouca informação ou às cegas
+- Revela dificuldade de crescer ou escalar
+- Revela risco financeiro ou comercial concreto
+- Revela coordenação difícil entre partes do mercado (autores, editoras, livrarias, fornecedores, leitores, canais, etc.)
+- Revela algo que alguém do mercado precisaria resolver para ganhar mais dinheiro, economizar tempo, reduzir risco ou operar melhor
 
-NÃO extraia:
-- Reclamações pessoais sem relação com o mercado de {market}
-- Piadas, opiniões soltas ou comentários de passagem
-- Frases que parecem interessantes mas não revelam um problema concreto
-- Resumo ou contexto geral do episódio
+IGNORE — não extraia:
+- Histórias pessoais sem consequência clara para o mercado
+- Frases inspiracionais ou motivacionais
+- Comentários culturais ou literários genéricos
+- Observações de carreira ou trajetória pessoal
+- Opiniões sem impacto comercial ou processual
+- Curiosidades, anedotas ou contexto histórico
+- Qualquer coisa que não responda: "qual processo ou resultado de negócio isso afeta?"
 
-Prefira poucos itens com alta evidência a muitos itens fracos.
+Prefira 5 itens excelentes a 20 itens mediocres.
 
 Para cada item, retorne um objeto JSON com:
 - "title": título curto da dor (máximo 10 palavras)
@@ -42,27 +48,19 @@ Para cada item, retorne um objeto JSON com:
 - "speaker_context": quem falou, se identificável (ou null)
 - "who_suffers": quem sofre essa dor no contexto de {market}
 - "business_impact": impacto no negócio ou processo
-- "severity": número de 1 a 5 (5 = mais grave)
+- "severity": número de 1 a 5 (5 = mais grave para o mercado)
 - "confidence": "low", "medium" ou "high" — certeza sobre a evidência
 - "opportunity": possível oportunidade de produto ou solução (separada da evidência)
+- "commercial_actionability": número de 1 a 5 seguindo esta escala:
+    1 = curioso, mas pouco acionável
+    2 = problema real mas vago, sem dono claro
+    3 = problema real, impacto identificável, mas amplo
+    4 = gargalo concreto com dono e impacto razoavelmente claro
+    5 = gargalo concreto, dono claro, impacto financeiro/operacional claro e consequência real se não resolvido
 
 NÃO invente frases, timestamps ou speakers. Se não tiver certeza, use confidence "low".
 
 Retorne APENAS um JSON array válido, sem texto adicional, sem blocos de código markdown."""
-
-CLUSTER_PROMPT = """Compare esta nova dor com os clusters existentes.
-
-Nova dor:
-- Título: {title}
-- Resumo: {summary}
-- Categoria: {category}
-
-Clusters existentes:
-{clusters}
-
-Agrupe APENAS se forem realmente a mesma dor ou muito similares. Não agrupe dores apenas relacionadas ou do mesmo tema.
-
-Retorne APENAS este JSON (sem texto extra): {{"cluster_id": <id_inteiro_ou_null>, "confidence": "low|medium|high"}}"""
 
 
 def _client():
@@ -110,30 +108,53 @@ def extract_pains_from_transcript(transcript: str, video_url: str = "", topic_ti
     return []
 
 
-def find_cluster(pain: dict, clusters: list[dict]) -> int | None:
-    if not clusters:
-        return None
+def find_clusters_batch(pains: list[dict], clusters: list[dict]) -> list[int | None]:
+    """Single Gemini call to assign all pains to existing clusters.
+    Returns a list of cluster_id (int) or None, one per pain, in the same order."""
+    if not clusters or not pains:
+        return [None] * len(pains)
 
+    pains_text = "\n".join(
+        f"{i}. {p.get('title', '')} — {(p.get('summary') or '')[:80]}"
+        for i, p in enumerate(pains)
+    )
     clusters_text = "\n".join(
-        f"- ID {c['id']}: {c['title']} | {(c.get('summary') or '')[:80]}"
+        f"ID {c['id']}: {c['title']} — {(c.get('summary') or '')[:80]}"
         for c in clusters
     )
 
-    prompt = CLUSTER_PROMPT.format(
-        title=pain.get("title", ""),
-        summary=pain.get("summary", ""),
-        category=pain.get("category", ""),
-        clusters=clusters_text
-    )
+    prompt = f"""Compare cada nova dor com os clusters existentes.
+
+Novas dores ({len(pains)} itens, indexados de 0):
+{pains_text}
+
+Clusters existentes:
+{clusters_text}
+
+Para cada nova dor, retorne o cluster_id do cluster existente se for realmente a mesma dor (ou muito similar), ou null se for diferente.
+
+Retorne APENAS um JSON array com exatamente {len(pains)} elementos, na mesma ordem das novas dores:
+[cluster_id_ou_null, ...]
+
+Exemplo para 3 dores: [42, null, 17]
+
+Agrupe APENAS dores realmente iguais ou muito similares. Não agrupe dores só por serem relacionadas."""
 
     try:
         client = _client()
         response = client.models.generate_content(model=_model(), contents=prompt)
         data = _parse_json(response.text)
-        cid = data.get("cluster_id")
-        if cid is not None:
-            return int(cid)
+        if isinstance(data, list):
+            result = []
+            for item in data[:len(pains)]:
+                try:
+                    result.append(int(item) if item is not None else None)
+                except (TypeError, ValueError):
+                    result.append(None)
+            while len(result) < len(pains):
+                result.append(None)
+            return result
     except Exception as e:
-        log.warning("Failed to parse cluster response: %s", e)
+        log.warning("Batch cluster failed: %s", e)
 
-    return None
+    return [None] * len(pains)

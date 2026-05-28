@@ -17,7 +17,7 @@
       {% endif %}
     </div>
     <div>
-      <span class="count-badge">{{ pains|length }} menção{% if pains|length != 1 %}ões{% endif %}</span>
+      <span class="count-badge">{{ pains|length }} {% if pains|length != 1 %}menções{% else %}menção{% endif %}</span>
     </div>
   </div>
 

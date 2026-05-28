@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS pains (
     severity INTEGER DEFAULT 3,
     confidence TEXT DEFAULT 'medium',
     opportunity TEXT,
+    commercial_actionability INTEGER DEFAULT 3,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
@@ -94,6 +95,11 @@ def db():
 def init_db():
     with db() as conn:
         conn.executescript(SCHEMA)
+        # Migrations for existing databases
+        try:
+            conn.execute("ALTER TABLE pains ADD COLUMN commercial_actionability INTEGER DEFAULT 3")
+        except Exception:
+            pass  # column already exists
 
 
 # ── Topics ───────────────────────────────────────────────────────────────────
@@ -224,15 +230,16 @@ def insert_pain(pain: dict) -> int:
         cur = conn.execute("""
             INSERT INTO pains (video_id, topic_id, cluster_id, title, summary, category, area,
                 timestamp_seconds, youtube_link, quote, speaker_context, who_suffers,
-                business_impact, severity, confidence, opportunity)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                business_impact, severity, confidence, opportunity, commercial_actionability)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             pain["video_id"], pain["topic_id"], pain.get("cluster_id"),
             pain.get("title", ""), pain.get("summary"), pain.get("category"), pain.get("area"),
             pain.get("timestamp_seconds"), pain.get("youtube_link"),
             pain.get("quote"), pain.get("speaker_context"), pain.get("who_suffers"),
             pain.get("business_impact"), pain.get("severity", 3),
-            pain.get("confidence", "medium"), pain.get("opportunity")
+            pain.get("confidence", "medium"), pain.get("opportunity"),
+            pain.get("commercial_actionability", 3)
         ))
         return cur.lastrowid
 
@@ -261,12 +268,14 @@ def get_topic_ranking(topic_id: int) -> list[dict]:
                 COUNT(DISTINCT p.video_id) as video_count,
                 COUNT(p.id) as mention_count,
                 ROUND(AVG(p.severity), 1) as avg_severity,
-                ROUND(AVG(CASE p.confidence WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 1) as avg_confidence
+                ROUND(AVG(CASE p.confidence WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 1) as avg_confidence,
+                ROUND(AVG(COALESCE(p.commercial_actionability, 3)), 1) as avg_actionability
             FROM pain_clusters pc
             JOIN pains p ON p.cluster_id = pc.id
             WHERE pc.topic_id = ?
+            AND COALESCE(p.commercial_actionability, 3) >= 3
             GROUP BY pc.id
-            ORDER BY video_count DESC, mention_count DESC, avg_severity DESC, avg_confidence DESC
+            ORDER BY video_count DESC, avg_actionability DESC, mention_count DESC, avg_severity DESC, avg_confidence DESC
         """, (topic_id,)).fetchall()
     return [dict(r) for r in rows]
 
