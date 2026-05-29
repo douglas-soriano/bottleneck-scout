@@ -12,7 +12,7 @@ Instead of starting from assumptions, the tool helps identify where the market i
 
 ## Demo
 
-![Bottleneck Scout Demo](docs/assets/video-demo.mp4)
+<a href="https://youtu.be/2aMdXJP6Rus"><img src="docs/assets/bottleneck-scout-demo.png" alt="Bottleneck Scout Demo" /></a>
 
 ---
 
