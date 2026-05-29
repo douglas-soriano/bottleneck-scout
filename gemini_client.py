@@ -1,66 +1,21 @@
 import os
 import json
 import logging
+import time
+from pathlib import Path
+
 from google import genai
 from google.genai import types
 
 log = logging.getLogger(__name__)
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
 
 def _build_extraction_prompt(topic_title: str) -> str:
-    market = topic_title.strip() if topic_title.strip() else "o mercado analisado"
-    return f"""Você é um analista especializado em pesquisa de mercado.
-
-Mercado sendo analisado: {market}
-
-Analise este podcast e extraia SOMENTE sinais de gargalo, dor ou ineficiência do mercado de {market}.
-
-CRITÉRIO DE INCLUSÃO — inclua apenas se passar por ao menos 1 destes testes:
-- Revela processo manual, lento ou feito "na mão"
-- Revela gargalo operacional claro
-- Revela dificuldade de venda, marketing, distribuição ou aquisição
-- Revela custo alto ou inesperado
-- Revela perda de tempo recorrente
-- Revela retrabalho ou erro que precisa ser corrigido
-- Revela decisão tomada com pouca informação ou às cegas
-- Revela dificuldade de crescer ou escalar
-- Revela risco financeiro ou comercial concreto
-- Revela coordenação difícil entre partes do mercado (autores, editoras, livrarias, fornecedores, leitores, canais, etc.)
-- Revela algo que alguém do mercado precisaria resolver para ganhar mais dinheiro, economizar tempo, reduzir risco ou operar melhor
-
-IGNORE — não extraia:
-- Histórias pessoais sem consequência clara para o mercado
-- Frases inspiracionais ou motivacionais
-- Comentários culturais ou literários genéricos
-- Observações de carreira ou trajetória pessoal
-- Opiniões sem impacto comercial ou processual
-- Curiosidades, anedotas ou contexto histórico
-- Qualquer coisa que não responda: "qual processo ou resultado de negócio isso afeta?"
-
-Prefira 5 itens excelentes a 20 itens mediocres.
-
-Para cada item, retorne um objeto JSON com:
-- "title": título curto da dor (máximo 10 palavras)
-- "summary": resumo objetivo do problema
-- "category": categoria — operacional, financeiro, marketing, vendas, atendimento, produção, tecnologia, RH, distribuição, relacionamento, ou outra
-- "area": área do processo ou negócio afetada
-- "timestamp_seconds": número inteiro em segundos onde é mencionado (ou null)
-- "quote": frase falada ou paráfrase próxima do que foi dito (NÃO invente)
-- "speaker_context": quem falou, se identificável (ou null)
-- "who_suffers": quem sofre essa dor no contexto de {market}
-- "business_impact": impacto no negócio ou processo
-- "severity": número de 1 a 5 (5 = mais grave para o mercado)
-- "confidence": "low", "medium" ou "high" — certeza sobre a evidência
-- "opportunity": possível oportunidade de produto ou solução (separada da evidência)
-- "commercial_actionability": número de 1 a 5 seguindo esta escala:
-    1 = curioso, mas pouco acionável
-    2 = problema real mas vago, sem dono claro
-    3 = problema real, impacto identificável, mas amplo
-    4 = gargalo concreto com dono e impacto razoavelmente claro
-    5 = gargalo concreto, dono claro, impacto financeiro/operacional claro e consequência real se não resolvido
-
-NÃO invente frases, timestamps ou speakers. Se não tiver certeza, use confidence "low".
-
-Retorne APENAS um JSON array válido, sem texto adicional, sem blocos de código markdown."""
+    market = topic_title.strip() if topic_title.strip() else "the analyzed market"
+    output_language = os.environ.get("ANALYSIS_OUTPUT_LANGUAGE", "pt-BR")
+    template = (PROMPTS_DIR / "extraction.md").read_text(encoding="utf-8")
+    return template.format(market=market, output_language=output_language)
 
 
 def _client():
@@ -71,37 +26,60 @@ def _model():
     return os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
 
 
+def _json_config():
+    return types.GenerateContentConfig(response_mime_type="application/json")
+
+
+def _generate_json(contents):
+    attempts = int(os.environ.get("GEMINI_MAX_ATTEMPTS", "3"))
+    delay = float(os.environ.get("GEMINI_RETRY_BASE_SECONDS", "1"))
+    client = _client()
+    last_error = None
+
+    for attempt in range(attempts):
+        try:
+            started = time.monotonic()
+            log.info("Gemini call attempt=%d model=%s", attempt + 1, _model())
+            response = client.models.generate_content(
+                model=_model(),
+                contents=contents,
+                config=_json_config(),
+            )
+            elapsed = time.monotonic() - started
+            log.info("Gemini call succeeded attempt=%d elapsed=%.2fs", attempt + 1, elapsed)
+            return response
+        except Exception as exc:
+            last_error = exc
+            if attempt == attempts - 1:
+                break
+            sleep_for = delay * (2 ** attempt)
+            log.warning("Gemini call failed, retrying in %.1fs: %s", sleep_for, exc)
+            time.sleep(sleep_for)
+
+    raise last_error
+
+
 def _parse_json(text: str) -> list | dict:
     text = text.strip()
     if text.startswith("```"):
         lines = text.split("\n")
         # drop first line (```json or ```) and last line (```)
         text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    return json.loads(text)
 
-
-def extract_pains_from_url(url: str, topic_title: str = "") -> list[dict]:
-    client = _client()
-    response = client.models.generate_content(
-        model=_model(),
-        contents=[
-            types.Content(parts=[
-                types.Part(file_data=types.FileData(file_uri=url)),
-                types.Part(text=_build_extraction_prompt(topic_title)),
-            ])
-        ]
-    )
-    result = _parse_json(response.text)
-    if isinstance(result, list):
-        return result
-    return []
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        starts = [idx for idx in (text.find("["), text.find("{")) if idx != -1]
+        ends = [idx for idx in (text.rfind("]"), text.rfind("}")) if idx != -1]
+        if not starts or not ends:
+            raise
+        return json.loads(text[min(starts):max(ends) + 1])
 
 
 def extract_pains_from_transcript(transcript: str, video_url: str = "", topic_title: str = "") -> list[dict]:
-    client = _client()
     base_prompt = _build_extraction_prompt(topic_title)
-    prompt = f"{base_prompt}\n\nTranscrição do vídeo{' (' + video_url + ')' if video_url else ''}:\n\n{transcript[:60000]}"
-    response = client.models.generate_content(model=_model(), contents=prompt)
+    prompt = f"{base_prompt}\n\nVideo transcript{' (' + video_url + ')' if video_url else ''}:\n\n{transcript[:60000]}"
+    response = _generate_json(prompt)
     result = _parse_json(response.text)
     if isinstance(result, list):
         return result
@@ -123,26 +101,15 @@ def find_clusters_batch(pains: list[dict], clusters: list[dict]) -> list[int | N
         for c in clusters
     )
 
-    prompt = f"""Compare cada nova dor com os clusters existentes.
-
-Novas dores ({len(pains)} itens, indexados de 0):
-{pains_text}
-
-Clusters existentes:
-{clusters_text}
-
-Para cada nova dor, retorne o cluster_id do cluster existente se for realmente a mesma dor (ou muito similar), ou null se for diferente.
-
-Retorne APENAS um JSON array com exatamente {len(pains)} elementos, na mesma ordem das novas dores:
-[cluster_id_ou_null, ...]
-
-Exemplo para 3 dores: [42, null, 17]
-
-Agrupe APENAS dores realmente iguais ou muito similares. Não agrupe dores só por serem relacionadas."""
+    template = (PROMPTS_DIR / "clustering.md").read_text(encoding="utf-8")
+    prompt = template.format(
+        pain_count=len(pains),
+        pains_text=pains_text,
+        clusters_text=clusters_text,
+    )
 
     try:
-        client = _client()
-        response = client.models.generate_content(model=_model(), contents=prompt)
+        response = _generate_json(prompt)
         data = _parse_json(response.text)
         if isinstance(data, list):
             result = []

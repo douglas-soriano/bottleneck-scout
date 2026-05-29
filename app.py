@@ -1,6 +1,6 @@
-import re
 import logging
-import os
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -10,24 +10,21 @@ from fastapi.templating import Jinja2Templates
 
 import db
 import worker
-import gemini_client
+from sources import get_provider_for_url
 
 logging.basicConfig(level=logging.INFO)
-app = FastAPI(title="Podcast Finder")
+log = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="templates")
 
-YT_PATTERN = re.compile(r'(?:v=|youtu\.be/|shorts/)([a-zA-Z0-9_-]{11})')
 
-
-def extract_youtube_id(url: str) -> str | None:
-    m = YT_PATTERN.search(url)
-    return m.group(1) if m else None
-
-
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     db.init_db()
     worker.start_worker()
+    yield
+
+
+app = FastAPI(title="Business Bottlenecks Finder", lifespan=lifespan)
 
 
 # ── Topics ───────────────────────────────────────────────────────────────────
@@ -115,12 +112,16 @@ def add_videos(topic_id: int, urls: str = Form(...)):
         url = line.strip()
         if not url:
             continue
-        yt_id = extract_youtube_id(url)
-        if not yt_id:
+        provider = get_provider_for_url(url)
+        if not provider:
             continue
-        if db.get_video_by_youtube_id(topic_id, yt_id):
+        external_id = provider.external_id(url)
+        if not external_id:
             continue
-        db.add_video(topic_id, url, yt_id)
+        if db.get_video_by_source_id(topic_id, provider.source, external_id):
+            continue
+        db.add_item(topic_id, provider.source, url, external_id)
+        log.info("Queued source topic_id=%d source=%s external_id=%s", topic_id, provider.source, external_id)
 
     return RedirectResponse(f"/topics/{topic_id}", status_code=303)
 
@@ -154,23 +155,9 @@ def submit_transcript(video_id: int, transcript: str = Form(...)):
     if not transcript:
         return RedirectResponse(f"/topics/{video['topic_id']}", status_code=303)
 
-    db.update_video(video_id, status="processing", transcript=transcript)
-
-    topic = db.get_topic(video["topic_id"])
-    topic_title = topic["title"] if topic else ""
-
-    try:
-        pains = gemini_client.extract_pains_from_transcript(transcript, video["url"], topic_title=topic_title)
-        if pains:
-            worker.save_pains(video_id, video["topic_id"], pains, video["url"])
-        else:
-            db.update_video(
-                video_id,
-                status="waiting_manual_transcript",
-                error_msg="Gemini não encontrou dores na transcrição fornecida."
-            )
-    except Exception as e:
-        db.update_video(video_id, status="failed", error_msg=str(e))
+    db.delete_pains_for_video(video_id)
+    db.update_video(video_id, status="queued", transcript=transcript, error_msg=None)
+    log.info("Manual transcript queued video_id=%d chars=%d", video_id, len(transcript))
 
     return RedirectResponse(f"/topics/{video['topic_id']}", status_code=303)
 
@@ -180,7 +167,9 @@ def retry_video(video_id: int):
     video = db.get_video(video_id)
     if not video:
         raise HTTPException(404)
+    db.delete_pains_for_video(video_id)
     db.update_video(video_id, status="queued", error_msg=None)
+    log.info("Retry queued video_id=%d", video_id)
     return RedirectResponse(f"/topics/{video['topic_id']}", status_code=303)
 
 

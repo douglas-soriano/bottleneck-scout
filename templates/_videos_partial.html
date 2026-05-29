@@ -10,7 +10,7 @@
   <table>
     <thead>
       <tr>
-        <th>Vídeo</th>
+        <th>Fonte</th>
         <th>Status</th>
         <th>Dores</th>
         <th></th>
@@ -21,10 +21,10 @@
       <tr>
         <td style="max-width:320px">
           <div style="font-weight:500;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            {{ v.title or v.url }}
+            {{ v.title or v.source_url }}
           </div>
           {% if v.title %}
-          <div style="font-size:.75rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.url }}</div>
+          <div style="font-size:.75rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.source_url }}</div>
           {% endif %}
         </td>
         <td>

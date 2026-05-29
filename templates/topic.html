@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ topic.title }} — Podcast Finder{% endblock %}
+{% block title %}{{ topic.title }} — Business Bottlenecks Finder{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
@@ -17,8 +17,8 @@
 <div class="card card-sm" style="margin-bottom:1.5rem">
   <form method="post" action="/topics/{{ topic.id }}/videos">
     <div class="form-group" style="margin-bottom:.5rem">
-      <label for="urls">Adicionar links do YouTube <span style="font-weight:400;color:#64748b">(um por linha)</span></label>
-      <textarea id="urls" name="urls" placeholder="https://www.youtube.com/watch?v=...&#10;https://youtu.be/..." rows="3"></textarea>
+      <label for="urls">Adicionar fontes <span style="font-weight:400;color:#64748b">(YouTube ou TikTok, um por linha)</span></label>
+      <textarea id="urls" name="urls" placeholder="https://www.youtube.com/watch?v=...&#10;https://www.tiktok.com/@perfil/video/..." rows="3"></textarea>
     </div>
     <button type="submit" class="btn btn-primary btn-sm">Adicionar à fila</button>
   </form>
@@ -26,7 +26,7 @@
 
 <!-- Video list (HTMX-polled) -->
 <div class="section-header">
-  <h2>Vídeos</h2>
+  <h2>Fontes</h2>
 </div>
 
 {% include "_videos_partial.html" %}

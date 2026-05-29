@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS topics (
 CREATE TABLE IF NOT EXISTS videos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topic_id INTEGER NOT NULL,
-    url TEXT NOT NULL,
-    youtube_id TEXT,
+    source_url TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'youtube',
+    external_id TEXT,
     title TEXT,
     status TEXT NOT NULL DEFAULT 'queued',
     error_msg TEXT,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS pains (
     category TEXT,
     area TEXT,
     timestamp_seconds INTEGER,
-    youtube_link TEXT,
+    source_link TEXT,
     quote TEXT,
     speaker_context TEXT,
     who_suffers TEXT,
@@ -79,6 +80,16 @@ def _conn():
     return conn
 
 
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _add_column(conn: sqlite3.Connection, table: str, columns: set[str], column: str, definition: str):
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        columns.add(column)
+
+
 @contextmanager
 def db():
     conn = _conn()
@@ -95,11 +106,45 @@ def db():
 def init_db():
     with db() as conn:
         conn.executescript(SCHEMA)
-        # Migrations for existing databases
-        try:
-            conn.execute("ALTER TABLE pains ADD COLUMN commercial_actionability INTEGER DEFAULT 3")
-        except Exception:
-            pass  # column already exists
+        topic_columns = _columns(conn, "topics")
+        _add_column(conn, "topics", topic_columns, "created_at", "TEXT")
+
+        video_columns = _columns(conn, "videos")
+        _add_column(conn, "videos", video_columns, "source", "TEXT NOT NULL DEFAULT 'youtube'")
+        _add_column(conn, "videos", video_columns, "external_id", "TEXT")
+        _add_column(conn, "videos", video_columns, "source_url", "TEXT")
+        _add_column(conn, "videos", video_columns, "title", "TEXT")
+        _add_column(conn, "videos", video_columns, "error_msg", "TEXT")
+        _add_column(conn, "videos", video_columns, "transcript", "TEXT")
+        _add_column(conn, "videos", video_columns, "created_at", "TEXT")
+        _add_column(conn, "videos", video_columns, "processed_at", "TEXT")
+        if "url" in video_columns:
+            conn.execute("UPDATE videos SET source_url = COALESCE(source_url, url)")
+        if "youtube_id" in video_columns:
+            conn.execute("UPDATE videos SET external_id = COALESCE(external_id, youtube_id)")
+
+        cluster_columns = _columns(conn, "pain_clusters")
+        _add_column(conn, "pain_clusters", cluster_columns, "category", "TEXT")
+        _add_column(conn, "pain_clusters", cluster_columns, "summary", "TEXT")
+        _add_column(conn, "pain_clusters", cluster_columns, "best_quote", "TEXT")
+
+        pain_columns = _columns(conn, "pains")
+        _add_column(conn, "pains", pain_columns, "summary", "TEXT")
+        _add_column(conn, "pains", pain_columns, "category", "TEXT")
+        _add_column(conn, "pains", pain_columns, "area", "TEXT")
+        _add_column(conn, "pains", pain_columns, "timestamp_seconds", "INTEGER")
+        _add_column(conn, "pains", pain_columns, "source_link", "TEXT")
+        _add_column(conn, "pains", pain_columns, "quote", "TEXT")
+        _add_column(conn, "pains", pain_columns, "speaker_context", "TEXT")
+        _add_column(conn, "pains", pain_columns, "who_suffers", "TEXT")
+        _add_column(conn, "pains", pain_columns, "business_impact", "TEXT")
+        _add_column(conn, "pains", pain_columns, "severity", "INTEGER DEFAULT 3")
+        _add_column(conn, "pains", pain_columns, "confidence", "TEXT DEFAULT 'medium'")
+        _add_column(conn, "pains", pain_columns, "opportunity", "TEXT")
+        _add_column(conn, "pains", pain_columns, "commercial_actionability", "INTEGER DEFAULT 3")
+        _add_column(conn, "pains", pain_columns, "created_at", "TEXT")
+        if "youtube_link" in pain_columns:
+            conn.execute("UPDATE pains SET source_link = COALESCE(source_link, youtube_link)")
 
 
 # ── Topics ───────────────────────────────────────────────────────────────────
@@ -155,20 +200,28 @@ def get_videos_by_topic(topic_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_video_by_youtube_id(topic_id: int, youtube_id: str) -> dict | None:
+def get_video_by_source_id(topic_id: int, source: str, external_id: str) -> dict | None:
     with db() as conn:
         row = conn.execute(
-            "SELECT * FROM videos WHERE topic_id = ? AND youtube_id = ?",
-            (topic_id, youtube_id)
+            """
+            SELECT * FROM videos
+            WHERE topic_id = ?
+            AND source = ?
+            AND external_id = ?
+            """,
+            (topic_id, source, external_id)
         ).fetchone()
     return dict(row) if row else None
 
 
-def add_video(topic_id: int, url: str, youtube_id: str | None) -> int:
+def add_item(topic_id: int, source: str, source_url: str, external_id: str | None) -> int:
     with db() as conn:
         cur = conn.execute(
-            "INSERT INTO videos (topic_id, url, youtube_id) VALUES (?, ?, ?)",
-            (topic_id, url, youtube_id)
+            """
+            INSERT INTO videos (topic_id, source, external_id, source_url)
+            VALUES (?, ?, ?, ?)
+            """,
+            (topic_id, source, external_id, source_url)
         )
         return cur.lastrowid
 
@@ -185,6 +238,11 @@ def update_video(video_id: int, **kwargs):
 def delete_video(video_id: int):
     with db() as conn:
         conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+
+
+def delete_pains_for_video(video_id: int):
+    with db() as conn:
+        conn.execute("DELETE FROM pains WHERE video_id = ?", (video_id,))
 
 
 def get_queued_videos() -> list[dict]:
@@ -229,13 +287,13 @@ def insert_pain(pain: dict) -> int:
     with db() as conn:
         cur = conn.execute("""
             INSERT INTO pains (video_id, topic_id, cluster_id, title, summary, category, area,
-                timestamp_seconds, youtube_link, quote, speaker_context, who_suffers,
+                timestamp_seconds, source_link, quote, speaker_context, who_suffers,
                 business_impact, severity, confidence, opportunity, commercial_actionability)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             pain["video_id"], pain["topic_id"], pain.get("cluster_id"),
             pain.get("title", ""), pain.get("summary"), pain.get("category"), pain.get("area"),
-            pain.get("timestamp_seconds"), pain.get("youtube_link"),
+            pain.get("timestamp_seconds"), pain.get("source_link"),
             pain.get("quote"), pain.get("speaker_context"), pain.get("who_suffers"),
             pain.get("business_impact"), pain.get("severity", 3),
             pain.get("confidence", "medium"), pain.get("opportunity"),
@@ -289,7 +347,8 @@ def get_cluster(cluster_id: int) -> dict | None:
 def get_cluster_pains(cluster_id: int) -> list[dict]:
     with db() as conn:
         rows = conn.execute("""
-            SELECT p.*, v.url as video_url, v.title as video_title, v.youtube_id
+            SELECT p.*, v.source_url as video_url, v.title as video_title,
+                v.external_id, v.source
             FROM pains p
             JOIN videos v ON p.video_id = v.id
             WHERE p.cluster_id = ?

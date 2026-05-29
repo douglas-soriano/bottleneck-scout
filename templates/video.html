@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}{{ video.title or video.url }} — Podcast Finder{% endblock %}
+{% block title %}{{ video.title or video.source_url }} — Business Bottlenecks Finder{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
   <a href="/">Tópicos</a> ›
   <a href="/topics/{{ topic.id }}">{{ topic.title }}</a> ›
-  {{ video.title or 'Vídeo' }}
+  {{ video.title or 'Fonte' }}
 </div>
 
 <div class="card" style="margin-bottom:1.25rem">
   <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
     <div style="flex:1">
-      <h1 style="font-size:1.15rem;margin-bottom:.35rem">{{ video.title or video.url }}</h1>
+      <h1 style="font-size:1.15rem;margin-bottom:.35rem">{{ video.title or video.source_url }}</h1>
       <div style="font-size:.82rem;color:#64748b">
-        <a href="{{ video.url }}" target="_blank">{{ video.url }}</a>
+        <a href="{{ video.source_url }}" target="_blank">{{ video.source_url }}</a>
       </div>
     </div>
     <span class="badge badge-{{ video.status }}">
@@ -43,12 +43,10 @@
     <div class="form-group">
       <textarea name="transcript" rows="10" placeholder="[00:00] Olá, bem-vindo ao podcast...&#10;[01:30] O maior problema que temos é..."></textarea>
     </div>
-    <div class="row">
-      <button type="submit" class="btn btn-primary">Processar transcrição</button>
-      <form method="post" action="/videos/{{ video.id }}/ignore" style="display:inline">
-        <button type="submit" class="btn btn-ghost">Ignorar vídeo</button>
-      </form>
-    </div>
+    <button type="submit" class="btn btn-primary">Processar transcrição</button>
+  </form>
+  <form method="post" action="/videos/{{ video.id }}/ignore" style="display:inline-block;margin-top:.5rem">
+    <button type="submit" class="btn btn-ghost">Ignorar fonte</button>
   </form>
 </div>
 {% endif %}
@@ -89,7 +87,7 @@
 
   <div class="pain-meta">
     {% if p.timestamp_seconds is not none %}
-    <a href="{{ p.youtube_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
+    <a href="{{ p.source_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
     {% endif %}
     {% if p.area %}
     <span class="conf">Área: {{ p.area }}</span>

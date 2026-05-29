@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ cluster.title }} — Podcast Finder{% endblock %}
+{% block title %}{{ cluster.title }} — Business Bottlenecks Finder{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
@@ -51,7 +51,7 @@
 
   <div class="pain-meta">
     {% if p.timestamp_seconds is not none %}
-    <a href="{{ p.youtube_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
+    <a href="{{ p.source_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
     {% endif %}
     {% if p.speaker_context %}
     <span class="conf">Falante: {{ p.speaker_context }}</span>
