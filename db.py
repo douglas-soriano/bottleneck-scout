@@ -216,12 +216,20 @@ def get_video_by_source_id(topic_id: int, source: str, external_id: str) -> dict
 
 def add_item(topic_id: int, source: str, source_url: str, external_id: str | None) -> int:
     with db() as conn:
+        columns = _columns(conn, "videos")
+        insert_columns = ["topic_id", "source", "external_id", "source_url"]
+        values = [topic_id, source, external_id, source_url]
+        if "url" in columns:
+            insert_columns.append("url")
+            values.append(source_url)
+        if "youtube_id" in columns:
+            insert_columns.append("youtube_id")
+            values.append(external_id if source == "youtube" else None)
+
+        placeholders = ", ".join("?" for _ in insert_columns)
         cur = conn.execute(
-            """
-            INSERT INTO videos (topic_id, source, external_id, source_url)
-            VALUES (?, ?, ?, ?)
-            """,
-            (topic_id, source, external_id, source_url)
+            f"INSERT INTO videos ({', '.join(insert_columns)}) VALUES ({placeholders})",
+            values,
         )
         return cur.lastrowid
 

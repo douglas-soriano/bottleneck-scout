@@ -83,3 +83,50 @@ def test_old_schema_migrates_youtube_fields(monkeypatch, tmp_path):
     assert video["external_id"] == "abcdefghijk"
     assert video["source_url"] == "https://youtu.be/abcdefghijk"
     assert pain["source_link"] == "https://www.youtube.com/watch?v=abcdefghijk&t=30s"
+
+
+def test_add_item_writes_required_legacy_url_column(monkeypatch, tmp_path):
+    db_path = tmp_path / "legacy-insert.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript("""
+        CREATE TABLE topics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL
+        );
+        CREATE TABLE videos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic_id INTEGER NOT NULL,
+            url TEXT NOT NULL,
+            youtube_id TEXT,
+            status TEXT NOT NULL DEFAULT 'queued'
+        );
+        CREATE TABLE pain_clusters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic_id INTEGER NOT NULL,
+            title TEXT NOT NULL
+        );
+        CREATE TABLE pains (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            video_id INTEGER NOT NULL,
+            topic_id INTEGER NOT NULL,
+            cluster_id INTEGER,
+            title TEXT NOT NULL,
+            youtube_link TEXT
+        );
+        INSERT INTO topics (id, title) VALUES (1, 'Publishing');
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+    db = load_db(monkeypatch, db_path)
+    db.init_db()
+
+    video_id = db.add_item(1, "youtube", "https://youtu.be/abcdefghijk", "abcdefghijk")
+    video = db.get_video(video_id)
+
+    assert video["url"] == "https://youtu.be/abcdefghijk"
+    assert video["youtube_id"] == "abcdefghijk"
+    assert video["source_url"] == "https://youtu.be/abcdefghijk"
+    assert video["external_id"] == "abcdefghijk"

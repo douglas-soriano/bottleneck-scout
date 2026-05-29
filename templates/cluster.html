@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ cluster.title }} — Business Bottlenecks Finder{% endblock %}
+{% block title %}{{ cluster.title }} - Bottleneck Scout{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/">Tópicos</a> ›
+  <a href="/">Topics</a> ›
   <a href="/topics/{{ topic.id }}">{{ topic.title }}</a> ›
   {{ cluster.title }}
 </div>
@@ -17,7 +17,7 @@
       {% endif %}
     </div>
     <div>
-      <span class="count-badge">{{ pains|length }} {% if pains|length != 1 %}menções{% else %}menção{% endif %}</span>
+      <span class="count-badge">{{ pains|length }} mention{% if pains|length != 1 %}s{% endif %}</span>
     </div>
   </div>
 
@@ -27,7 +27,7 @@
 </div>
 
 {% if pains %}
-<h2>Todas as menções</h2>
+<h2>All mentions</h2>
 
 {% for p in pains %}
 <div class="pain-card">
@@ -54,18 +54,18 @@
     <a href="{{ p.source_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
     {% endif %}
     {% if p.speaker_context %}
-    <span class="conf">Falante: {{ p.speaker_context }}</span>
+    <span class="conf">Speaker: {{ p.speaker_context }}</span>
     {% endif %}
     {% if p.who_suffers %}
-    <span class="conf">Quem sofre: {{ p.who_suffers }}</span>
+    <span class="conf">Who suffers: {{ p.who_suffers }}</span>
     {% endif %}
     {% if p.area %}
-    <span class="conf">Área: {{ p.area }}</span>
+    <span class="conf">Area: {{ p.area }}</span>
     {% endif %}
   </div>
 
   {% if p.business_impact %}
-  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impacto:</strong> {{ p.business_impact }}</div>
+  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impact:</strong> {{ p.business_impact }}</div>
   {% endif %}
 
   {% if p.opportunity %}
@@ -74,7 +74,7 @@
 </div>
 {% endfor %}
 {% else %}
-<div class="empty card">Nenhuma menção encontrada.</div>
+<div class="empty card">No mentions found.</div>
 {% endif %}
 
 {% endblock %}

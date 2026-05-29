@@ -10,9 +10,9 @@
   <table>
     <thead>
       <tr>
-        <th>Fonte</th>
+        <th>Source</th>
         <th>Status</th>
-        <th>Dores</th>
+        <th>Pains</th>
         <th></th>
       </tr>
     </thead>
@@ -29,28 +29,28 @@
         </td>
         <td>
           <span class="badge badge-{{ v.status }}">
-            {% if v.status == 'queued' %}Na fila
-            {% elif v.status == 'processing' %}Processando…
-            {% elif v.status == 'completed' %}Concluído
-            {% elif v.status == 'failed' %}Falhou
-            {% elif v.status == 'waiting_manual_transcript' %}Aguarda transcrição
-            {% elif v.status == 'ignored' %}Ignorado
+            {% if v.status == 'queued' %}Queued
+            {% elif v.status == 'processing' %}Processing…
+            {% elif v.status == 'completed' %}Done
+            {% elif v.status == 'failed' %}Failed
+            {% elif v.status == 'waiting_manual_transcript' %}Needs transcript
+            {% elif v.status == 'ignored' %}Ignored
             {% else %}{{ v.status }}{% endif %}
           </span>
         </td>
         <td>
           {% if v.status == 'completed' %}
-          <a href="/videos/{{ v.id }}" class="btn btn-ghost btn-sm">Ver dores</a>
+          <a href="/videos/{{ v.id }}" class="btn btn-ghost btn-sm">View pains</a>
           {% elif v.status == 'waiting_manual_transcript' %}
-          <a href="/videos/{{ v.id }}" class="btn btn-warn btn-sm">Colar transcrição</a>
+          <a href="/videos/{{ v.id }}" class="btn btn-warn btn-sm">Paste transcript</a>
           {% elif v.status == 'failed' %}
           <form method="post" action="/videos/{{ v.id }}/retry" style="display:inline">
-            <button class="btn btn-ghost btn-sm">Retentar</button>
+            <button class="btn btn-ghost btn-sm">Retry</button>
           </form>
           {% endif %}
         </td>
         <td>
-          <form method="post" action="/videos/{{ v.id }}/delete" onsubmit="return confirm('Deletar vídeo e suas dores?')">
+          <form method="post" action="/videos/{{ v.id }}/delete" onsubmit="return confirm('Delete this source and its extracted pains?')">
             <button type="submit" class="btn btn-danger btn-sm">×</button>
           </form>
         </td>
@@ -67,7 +67,7 @@
   </table>
 </div>
 {% else %}
-<div class="empty card">Nenhum vídeo adicionado ainda.</div>
+<div class="empty card">No sources added yet.</div>
 {% endif %}
 
 </div>

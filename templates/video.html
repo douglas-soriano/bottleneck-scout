@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ video.title or video.source_url }} — Business Bottlenecks Finder{% endblock %}
+{% block title %}{{ video.title or video.source_url }} - Bottleneck Scout{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/">Tópicos</a> ›
+  <a href="/">Topics</a> ›
   <a href="/topics/{{ topic.id }}">{{ topic.title }}</a> ›
-  {{ video.title or 'Fonte' }}
+  {{ video.title or 'Source' }}
 </div>
 
 <div class="card" style="margin-bottom:1.25rem">
@@ -17,12 +17,12 @@
       </div>
     </div>
     <span class="badge badge-{{ video.status }}">
-      {% if video.status == 'queued' %}Na fila
-      {% elif video.status == 'processing' %}Processando…
-      {% elif video.status == 'completed' %}Concluído
-      {% elif video.status == 'failed' %}Falhou
-      {% elif video.status == 'waiting_manual_transcript' %}Aguarda transcrição manual
-      {% elif video.status == 'ignored' %}Ignorado
+      {% if video.status == 'queued' %}Queued
+      {% elif video.status == 'processing' %}Processing…
+      {% elif video.status == 'completed' %}Done
+      {% elif video.status == 'failed' %}Failed
+      {% elif video.status == 'waiting_manual_transcript' %}Needs transcript
+      {% elif video.status == 'ignored' %}Ignored
       {% else %}{{ video.status }}{% endif %}
     </span>
   </div>
@@ -35,18 +35,18 @@
 <!-- Manual transcript form -->
 {% if video.status == 'waiting_manual_transcript' %}
 <div class="card" style="margin-bottom:1.25rem">
-  <h2>Colar transcrição manual</h2>
+  <h2>Paste transcript</h2>
   <p style="font-size:.875rem;color:#475569;margin-bottom:.75rem">
-    Cole abaixo a transcrição ou legenda do vídeo. Timestamps no formato <code>[MM:SS]</code> ajudam na extração.
+    Paste the video transcript or captions below. Timestamps in <code>[MM:SS]</code> format help with extraction.
   </p>
   <form method="post" action="/videos/{{ video.id }}/transcript">
     <div class="form-group">
-      <textarea name="transcript" rows="10" placeholder="[00:00] Olá, bem-vindo ao podcast...&#10;[01:30] O maior problema que temos é..."></textarea>
+      <textarea name="transcript" rows="10" placeholder="[00:00] Welcome to the podcast...&#10;[01:30] Our biggest problem is..."></textarea>
     </div>
-    <button type="submit" class="btn btn-primary">Processar transcrição</button>
+    <button type="submit" class="btn btn-primary">Process transcript</button>
   </form>
   <form method="post" action="/videos/{{ video.id }}/ignore" style="display:inline-block;margin-top:.5rem">
-    <button type="submit" class="btn btn-ghost">Ignorar fonte</button>
+    <button type="submit" class="btn btn-ghost">Ignore source</button>
   </form>
 </div>
 {% endif %}
@@ -54,7 +54,7 @@
 <!-- Pains list -->
 {% if pains %}
 <div class="section-header">
-  <h2>Dores extraídas</h2>
+  <h2>Extracted pains</h2>
   <span class="count-badge">{{ pains|length }}</span>
 </div>
 
@@ -90,18 +90,18 @@
     <a href="{{ p.source_link }}" target="_blank" class="ts-link">▶ {{ '%02d'|format(p.timestamp_seconds // 60) }}:{{ '%02d'|format(p.timestamp_seconds % 60) }}</a>
     {% endif %}
     {% if p.area %}
-    <span class="conf">Área: {{ p.area }}</span>
+    <span class="conf">Area: {{ p.area }}</span>
     {% endif %}
     {% if p.who_suffers %}
-    <span class="conf">Quem sofre: {{ p.who_suffers }}</span>
+    <span class="conf">Who suffers: {{ p.who_suffers }}</span>
     {% endif %}
     {% if p.speaker_context %}
-    <span class="conf">Falante: {{ p.speaker_context }}</span>
+    <span class="conf">Speaker: {{ p.speaker_context }}</span>
     {% endif %}
   </div>
 
   {% if p.business_impact %}
-  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impacto:</strong> {{ p.business_impact }}</div>
+  <div style="font-size:.82rem;color:#475569;margin-top:.35rem"><strong>Impact:</strong> {{ p.business_impact }}</div>
   {% endif %}
 
   {% if p.opportunity %}
@@ -111,7 +111,7 @@
 {% endfor %}
 
 {% elif video.status == 'completed' %}
-<div class="empty card">Nenhuma dor encontrada neste vídeo.</div>
+<div class="empty card">No pains found in this source.</div>
 {% endif %}
 
 {% endblock %}

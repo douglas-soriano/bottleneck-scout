@@ -98,7 +98,7 @@ def process_video(video: dict):
         db.update_video(
             video_id,
             status="waiting_manual_transcript",
-            error_msg="Não foi possível obter transcrição automática. Cole a transcrição manualmente.",
+            error_msg="Could not fetch captions automatically. Paste the transcript manually.",
         )
         log.info("Video %d: waiting for manual transcript", video_id)
         return

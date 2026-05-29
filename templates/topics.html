@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Tópicos — Business Bottlenecks Finder{% endblock %}
+{% block title %}Topics - Bottleneck Scout{% endblock %}
 
 {% block content %}
 <div class="section-header">
-  <h1 style="margin-bottom:0">Tópicos de Pesquisa</h1>
+  <h1 style="margin-bottom:0">Research Topics</h1>
 </div>
 
 <div class="card card-sm" style="margin-bottom:1.5rem">
   <form method="post" action="/topics" style="display:flex;gap:.5rem;align-items:flex-end">
     <div class="form-group" style="flex:1;margin-bottom:0">
-      <label for="title">Novo tópico</label>
-      <input type="text" id="title" name="title" placeholder="Ex: Clínicas veterinárias" required autofocus>
+      <label for="title">New topic</label>
+      <input type="text" id="title" name="title" placeholder="e.g. Veterinary clinics" required autofocus>
     </div>
-    <button type="submit" class="btn btn-primary">Criar</button>
+    <button type="submit" class="btn btn-primary">Create</button>
   </form>
 </div>
 
@@ -21,9 +21,9 @@
   <table>
     <thead>
       <tr>
-        <th>Tópico</th>
-        <th>Fontes</th>
-        <th>Criado em</th>
+        <th>Topic</th>
+        <th>Sources</th>
+        <th>Created</th>
         <th></th>
       </tr>
     </thead>
@@ -34,14 +34,14 @@
           <a href="/topics/{{ t.id }}" style="font-weight:600;color:#0f172a">{{ t.title }}</a>
         </td>
         <td>
-          <span class="count-badge">{{ t.video_count }} vídeo{% if t.video_count != 1 %}s{% endif %}</span>
+          <span class="count-badge">{{ t.video_count }} source{% if t.video_count != 1 %}s{% endif %}</span>
         </td>
         <td class="conf">{{ t.created_at[:10] }}</td>
         <td>
           <div class="row" style="justify-content:flex-end">
-            <a href="/topics/{{ t.id }}/edit" class="btn btn-ghost btn-sm">Editar</a>
-            <form method="post" action="/topics/{{ t.id }}/delete" onsubmit="return confirm('Deletar tópico e todos os vídeos/dores?')">
-              <button type="submit" class="btn btn-danger btn-sm">Deletar</button>
+            <a href="/topics/{{ t.id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+            <form method="post" action="/topics/{{ t.id }}/delete" onsubmit="return confirm('Delete this topic and all its sources and pains?')">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
             </form>
           </div>
         </td>
@@ -52,7 +52,7 @@
 </div>
 {% else %}
 <div class="empty card">
-  Nenhum tópico ainda. Crie o primeiro acima.
+  No topics yet. Create your first one above.
 </div>
 {% endif %}
 {% endblock %}

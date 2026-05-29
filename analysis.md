@@ -1,4 +1,4 @@
-# Revisão Técnica — Business Bottlenecks Finder
+# Revisão Técnica - Business Bottlenecks Finder
 
 > Revisão de engenharia (Staff level) do projeto local antes de publicação em GitHub público.
 > Escopo avaliado: `app.py`, `worker.py`, `db.py`, `gemini_client.py`, `templates/`, configs e git.
@@ -31,7 +31,7 @@ Nenhum desses é grave isoladamente, mas juntos passam a impressão de protótip
 **Como corrigir:** antes de reprocessar (no início de `process_video` e em `submit_transcript`), apagar as dores existentes do vídeo: `DELETE FROM pains WHERE video_id = ?`. O trigger `cleanup_empty_clusters` já remove clusters órfãos. Reprocessar deve ser idempotente por `video_id`.
 
 ### 2. Código morto contradiz o fluxo documentado (severidade: alta para percepção)
-**O que está errado:** `extract_pains_from_url` implementa o passo 1, mas **nunca é chamado** — `process_video` vai direto para transcrição. Há código não usado e uma divergência entre a doc de intenção e o comportamento real.
+**O que está errado:** `extract_pains_from_url` implementa o passo 1, mas **nunca é chamado** - `process_video` vai direto para transcrição. Há código não usado e uma divergência entre a doc de intenção e o comportamento real.
 **Por que prejudica:** revisor lê `goal.md` (removido, pois era goal apenas inicial, não se aplica mais), lê o worker, e vê que o fluxo descrito não existe. Sinaliza "implementação inacabada" ou "doc desatualizada".
 **Como corrigir:** decidir explicitamente um dos dois caminhos: (a) remover `extract_pains_from_url`.
 
@@ -48,7 +48,7 @@ Nenhum desses é grave isoladamente, mas juntos passam a impressão de protótip
 ### 5. Acoplamento ao YouTube bloqueia evolução (severidade: média, dado o objetivo declarado)
 **O que está errado:** `videos.youtube_id`, `youtube_link`, `extract_youtube_id`, `yt_link_with_ts`, headers e parsing de transcript são todos YouTube-específicos e espalhados entre `app.py` e `worker.py` (regex `YT_PATTERN` está duplicada nos dois arquivos).
 **Por que prejudica:** o objetivo declarado é adicionar TikTok e Reddit. Hoje isso exige tocar schema, worker e rotas. Não é "extensão", é reescrita parcial.
-**Como corrigir:** ver "Arquitetura recomendada". Generalizar para `source` + `external_id` + `source_url` e introduzir uma abstração mínima de provider. Não precisa de plugin system — só uma interface e um dicionário de registro.
+**Como corrigir:** ver "Arquitetura recomendada". Generalizar para `source` + `external_id` + `source_url` e introduzir uma abstração mínima de provider. Não precisa de plugin system - só uma interface e um dicionário de registro.
 
 ### 6. `_parse_json` frágil (severidade: baixa-média)
 **O que está errado:** o parsing depende de o modelo devolver JSON limpo ou cercado por ``` ```. Qualquer prosa extra quebra `json.loads` e derruba o vídeo para `failed`.
@@ -87,7 +87,7 @@ Nenhum desses é grave isoladamente, mas juntos passam a impressão de protótip
 - Adicionar suíte mínima de testes (problema #4).
 - Rotacionar a chave Gemini e confirmar que `.env` segue ignorada (ver checklist).
 - `response_mime_type="application/json"` no cliente Gemini (problema #6).
-- Generalizar schema/lógica para múltiplas fontes (problema #5) — pelo menos a nomenclatura, mesmo que só YouTube exista hoje.
+- Generalizar schema/lógica para múltiplas fontes (problema #5) - pelo menos a nomenclatura, mesmo que só YouTube exista hoje.
 - Dedup de `YT_PATTERN`/`extract_youtube_id` e mover prompts para arquivos.
 - Retry com backoff (problema #7).
 - Migrar `on_event` → `lifespan` e `utcnow` → timezone-aware.

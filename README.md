@@ -1,4 +1,4 @@
-# Business Bottlenecks Finder
+# Bottleneck Scout
 
 Local-first research tool that turns long-form market conversations into ranked business pains. Add YouTube links to a topic, let the worker fetch transcripts, and review the extracted bottlenecks grouped by recurring pain point.
 

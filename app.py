@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Business Bottlenecks Finder", lifespan=lifespan)
+app = FastAPI(title="Bottleneck Scout", lifespan=lifespan)
 
 
 # ── Topics ───────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ def topics_list(request: Request):
 def create_topic(title: str = Form(...)):
     title = title.strip()
     if not title:
-        raise HTTPException(400, "Título obrigatório")
+        raise HTTPException(400, "Title is required")
     topic_id = db.create_topic(title)
     return RedirectResponse(f"/topics/{topic_id}", status_code=303)
 
@@ -57,7 +57,7 @@ def edit_topic_form(request: Request, topic_id: int):
 def edit_topic(topic_id: int, title: str = Form(...)):
     title = title.strip()
     if not title:
-        raise HTTPException(400, "Título obrigatório")
+        raise HTTPException(400, "Title is required")
     db.update_topic(topic_id, title)
     return RedirectResponse("/", status_code=303)
 

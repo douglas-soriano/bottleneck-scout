@@ -93,11 +93,11 @@ def find_clusters_batch(pains: list[dict], clusters: list[dict]) -> list[int | N
         return [None] * len(pains)
 
     pains_text = "\n".join(
-        f"{i}. {p.get('title', '')} — {(p.get('summary') or '')[:80]}"
+        f"{i}. {p.get('title', '')} - {(p.get('summary') or '')[:80]}"
         for i, p in enumerate(pains)
     )
     clusters_text = "\n".join(
-        f"ID {c['id']}: {c['title']} — {(c.get('summary') or '')[:80]}"
+        f"ID {c['id']}: {c['title']} - {(c.get('summary') or '')[:80]}"
         for c in clusters
     )
 
